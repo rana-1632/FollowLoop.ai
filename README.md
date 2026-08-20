@@ -18,43 +18,21 @@ By harnessing the power of advanced Large Language Models (LLM) alongside robust
 
 ---
 
-## 🎨 Visual Showcase & Platform Tour
+## 🎨 Application Screenshots
 
 <div align="center">
 
-### 1. Smart AI Sequence Builder & Nurture Canvas
-![Sequence Builder](./docs/1.png)
-*AI-driven sequence builder converting unstructured call notes into scheduled, multi-step email campaigns with tone customization and instant sign-off previews.*
+![Application Showcase](./docs/1.png)
 
----
+![Application Showcase](./docs/2.png)
 
-### 2. CRM Lead Pipeline & Tracking Dashboard
-![CRM Lead Tracking Pipeline](./docs/3.png)
-*Real-time kanban pipeline & lead status tracker displaying step progression, next due dates, and engagement analytics.*
+![Application Showcase](./docs/3.png)
 
----
+![Application Showcase](./docs/4.png)
 
-### 3. Integrated Analytics & Multi-Channel Management
-![Dashboard Analytics](./docs/2.png)
-*Comprehensive metrics tracking total leads, active follow-up sequences, conversion rates, and response times.*
+![Application Showcase](./docs/5.png)
 
----
-
-### 4. Authenticated Email Transport & Account Manager
-![Email Accounts Integration](./docs/4.png)
-*Secure Google OAuth 2.0 & SMTP credential manager with automated token refresh and transport diagnostics.*
-
----
-
-### 5. Step Timeline & Dispatch Schedule Modal
-![Step Management Drawer](./docs/5.png)
-*Interactive step detail drawer offering granular control over email copy, dispatch timing, and automated delays.*
-
----
-
-### 6. Mobile-First Gold Standard User Interface
-![Mobile Responsive UI](./docs/6.png)
-*Fully responsive, mobile-optimized experience featuring fluid card layouts, touch-friendly drawers, and adaptive popovers.*
+![Application Showcase](./docs/6.png)
 
 </div>
 
@@ -234,20 +212,22 @@ npm run dev
 
 ---
 
-## 🔒 Security & Compliance Audit
+## 🔒 Security & Data Protection Architecture
 
-- ✅ **No API Keys or Secrets Tracked**: Verified that `.env` files, JWT secrets, and API tokens are excluded from Git version control.
-- ✅ **AES-256-GCM Encryption**: User SMTP passcodes and OAuth refresh tokens are encrypted at rest using authenticated GCM mode before DB storage.
-- ✅ **CORS & Rate Limiting**: Production API routes are protected by origin filtering and input validation pipes.
+FollowLoop.ai is engineered with defense-in-depth security principles to protect sensitive lead data and email credentials:
+
+- **AES-256-GCM Credential Encryption**: Third-party SMTP passwords and OAuth 2.0 refresh tokens are encrypted at rest using Galois/Counter Mode (GCM) before database persistence.
+- **Stateless JWT Authentication**: Secure user sessions are managed via signed JSON Web Tokens (JWT) with strict token expiration and header-based authentication guards.
+- **CORS & Input Sanitization**: Backend endpoints are hardened with strict Cross-Origin Resource Sharing (CORS) policies and class-validator DTO sanitization pipes to protect against injection attacks.
+- **Zero Secret Exposure**: Environment variables and private API credentials are dynamically loaded and strictly excluded from version control.
 
 ---
 
-## 👨‍💻 Author & Maintainer
+## 👨‍💻 Author & Contact Information
 
-**Mohsin Ali (rana-1632)**
-- **GitHub**: [@rana-1632](https://github.com/rana-1632)
-- **Email**: [axm734@gmail.com](mailto:axm734@gmail.com)
-- **Project**: [FollowLoop.ai Repository](https://github.com/rana-1632/FollowLoop.ai.git)
+- **Name:** Mohsin Ali
+- **Email:** [mohsinalirana222@gmail.com](mailto:mohsinalirana222@gmail.com)
+- **GitHub:** [@rana-1632](https://github.com/rana-1632)
 
 ---
 <div align="center">
