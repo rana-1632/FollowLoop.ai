@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  ::selection {
+    @apply bg-accent-200 text-accent-900;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-strong rounded-full;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  h1, h2, h3, h4 {
+    @apply tracking-tight;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-[1280px] px-6;
+  }
+
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl backdrop-saturate-150;
+  }
+
+  .card {
+    @apply bg-surface rounded-2xl border border-border shadow-card;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full font-medium transition-all duration-300 ease-out-expo select-none disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-ink text-white px-5 py-2.5 text-sm shadow-soft hover:shadow-elevated hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-accent {
+    @apply btn bg-accent-500 text-white px-5 py-2.5 text-sm shadow-glow hover:bg-accent-600 hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-ink px-5 py-2.5 text-sm hover:bg-surface-muted;
+  }
+
+  .btn-outline {
+    @apply btn bg-surface border border-border text-ink px-5 py-2.5 text-sm hover:border-border-strong hover:-translate-y-0.5 active:translate-y-0 shadow-soft;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-ink placeholder:text-ink-muted outline-none transition-all duration-200 focus:border-accent-400 focus:ring-4 focus:ring-accent-100;
+  }
+
+  .section-eyebrow {
+    @apply pill bg-accent-50 text-accent-700 border border-accent-100 uppercase tracking-wider text-[11px] font-semibold;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-ink via-ink to-ink/70;
+  }
+
+  .text-gradient-accent {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-600 via-accent-500 to-cobalt-500;
+  }
+}
