@@ -227,7 +227,6 @@ FollowLoop.ai is engineered with defense-in-depth security principles to protect
 
 - **Name:** Mohsin Ali
 - **Email:** [mohsinalirana222@gmail.com](mailto:mohsinalirana222@gmail.com)
-- **GitHub:** [@rana-1632](https://github.com/rana-1632)
 
 ---
 <div align="center">
