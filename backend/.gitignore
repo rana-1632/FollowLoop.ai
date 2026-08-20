@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Production output
+dist
+dist/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS & IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local databases
+*.db
+*.sqlite
