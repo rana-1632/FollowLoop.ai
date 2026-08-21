@@ -67,9 +67,18 @@ export default function AuthLayout({
           </ul>
         </div>
 
-        <p className="relative z-10 text-xs text-white/40">
-          © {new Date().getFullYear()} FollowLoop.ai — All rights reserved.
-        </p>
+        <div className="relative z-10 flex items-center gap-3 text-xs text-white/40">
+          <span>© {new Date().getFullYear()} FollowLoop.ai</span>
+          <span>•</span>
+          <a
+            href="https://followloopai-production.up.railway.app/api/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-accent-300 transition-colors underline"
+          >
+            API Documentation
+          </a>
+        </div>
       </div>
 
       {/* Right — form panel */}
