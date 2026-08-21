@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  BookOpen,
 } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
 import Logo from "@/components/layout/Logo";
@@ -155,6 +156,40 @@ export default function Sidebar({
             </button>
           </div>
         )}
+
+        {/* Swagger API Documentation Button */}
+        <div className="px-3 mb-2 shrink-0">
+          <a
+            href="https://followloopai-production.up.railway.app/api/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={isCollapsed ? "API Documentation (Swagger UI)" : undefined}
+            className={cn(
+              "w-full flex items-center h-10 rounded-xl border border-border bg-surface hover:bg-surface-muted transition-colors text-xs font-semibold text-ink-soft select-none",
+              isCollapsed ? "justify-center px-1.5" : "justify-between px-2.5"
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center shrink-0">
+                <BookOpen size={16} className="text-accent-600" />
+              </div>
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap min-w-0",
+                  isCollapsed ? "max-w-0 opacity-0 pointer-events-none" : "max-w-[130px] opacity-100"
+                )}
+              >
+                <span className="truncate">API Documentation</span>
+              </div>
+            </div>
+
+            {!isCollapsed && (
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md shrink-0 transition-opacity duration-300">
+                Swagger
+              </span>
+            )}
+          </a>
+        </div>
 
         {/* Upgrade Card */}
         <div className="px-3 mb-3 shrink-0">

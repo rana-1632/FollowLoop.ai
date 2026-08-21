@@ -18,6 +18,14 @@ By harnessing the power of advanced Large Language Models (LLM) alongside robust
 
 ---
 
+## 📚 Live Interactive API Documentation
+
+FollowLoop.ai provides fully typed OpenAPI / Swagger 3.0 interactive documentation for exploring, inspecting, and testing all REST API endpoints live:
+
+👉 **[Explore Live Swagger API Documentation (https://followloopai-production.up.railway.app/api/docs)](https://followloopai-production.up.railway.app/api/docs)**
+
+---
+
 ## 🎨 Application Screenshots
 
 <div align="center">

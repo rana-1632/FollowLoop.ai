@@ -52,12 +52,23 @@ export default function Footer() {
               <ul className="mt-4 space-y-3">
                 {col.links.map((link) => (
                   <li key={link}>
-                    <a
-                      href="#"
-                      className="text-sm text-ink-muted transition-colors hover:text-ink"
-                    >
-                      {link}
-                    </a>
+                    {link === "API Reference" || link === "Documentation" ? (
+                      <a
+                        href="https://followloopai-production.up.railway.app/api/docs"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-ink-muted transition-colors hover:text-accent-600 font-medium"
+                      >
+                        {link === "API Reference" ? "API Documentation" : link}
+                      </a>
+                    ) : (
+                      <a
+                        href="#"
+                        className="text-sm text-ink-muted transition-colors hover:text-ink"
+                      >
+                        {link}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
