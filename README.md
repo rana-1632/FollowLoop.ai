@@ -42,6 +42,10 @@ FollowLoop.ai provides fully typed OpenAPI / Swagger 3.0 interactive documentati
 
 ![Application Showcase](./docs/6.png)
 
+![Sentry Error Monitoring Integration](./docs/7%20(Sentry).png)
+
+![Resend Email Integration](./docs/8%20(Resend).png)
+
 </div>
 
 ---
