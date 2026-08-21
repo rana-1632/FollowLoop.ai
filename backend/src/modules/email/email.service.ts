@@ -107,7 +107,12 @@ export class EmailService implements OnApplicationBootstrap {
       process.env.GOOGLE_OAUTH_REDIRECT_URI ||
       'http://localhost:3001/api/v1/emails/oauth/google/callback';
 
-    const scopes = ['https://www.googleapis.com/auth/gmail.send', 'email', 'profile'];
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.send',
+      'email',
+      'profile',
+      'openid',
+    ];
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -115,8 +120,9 @@ export class EmailService implements OnApplicationBootstrap {
       response_type: 'code',
       scope: scopes.join(' '),
       access_type: 'offline',
-      prompt: 'consent',
-      state: userId,
+      prompt: 'consent select_account',
+      include_granted_scopes: 'true',
+      state: userId || '',
     });
 
     return {
@@ -178,6 +184,21 @@ export class EmailService implements OnApplicationBootstrap {
         }
       }
 
+      // Resolve valid user ID
+      let targetUserId = stateUserId;
+      if (!targetUserId || targetUserId === 'undefined' || targetUserId.trim() === '') {
+        // Fallback: Find user by email profile if matching user exists
+        const existingUser = await this.prisma.user.findFirst({
+          where: { email: userEmail },
+        });
+        if (existingUser) {
+          targetUserId = existingUser.id;
+        } else {
+          this.logger.error(`[GOOGLE_OAUTH_CALLBACK] No valid stateUserId provided and no matching user found for ${userEmail}`);
+          return `${frontendUrl}/dashboard?oauth_error=INVALID_USER_SESSION`;
+        }
+      }
+
       // 3. Encrypt and store tokens in PostgreSQL EmailAccount table
       const encryptedAuth = encryptData(
         JSON.stringify({
@@ -189,13 +210,13 @@ export class EmailService implements OnApplicationBootstrap {
 
       // Unset previous default email accounts for user
       await this.prisma.emailAccount.updateMany({
-        where: { userId: stateUserId, isDefault: true },
+        where: { userId: targetUserId, isDefault: true },
         data: { isDefault: false },
       });
 
       await this.prisma.emailAccount.create({
         data: {
-          userId: stateUserId,
+          userId: targetUserId,
           email: userEmail,
           displayName: `${userName} (Google Gmail API)`,
           provider: EmailProvider.GMAIL_OAUTH,

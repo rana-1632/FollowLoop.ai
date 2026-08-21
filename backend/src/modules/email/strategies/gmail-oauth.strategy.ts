@@ -117,9 +117,14 @@ export class GmailOAuthStrategy implements EmailTransportStrategy {
       if (!response.ok) {
         const errorDetail = responseData?.error?.message || JSON.stringify(responseData);
         this.logger.error(`[GMAIL_API_REJECTED] Code: ${response.status} | Details: ${errorDetail}`);
+        
+        const friendlyError = response.status === 403
+          ? `[ERR_GMAIL_INSUFFICIENT_SCOPES] Google Account missing "Send emails on your behalf" permission. Re-connect Google Gmail in Settings and check all permission boxes.`
+          : `[ERR_GMAIL_API_REJECTED_${response.status}] ${errorDetail}`;
+
         return {
           success: false,
-          error: `[ERR_GMAIL_API_REJECTED_${response.status}] ${errorDetail}`,
+          error: friendlyError,
         };
       }
 
