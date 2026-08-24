@@ -63,12 +63,12 @@ async function bootstrap() {
     // Global API Prefix
     app.setGlobalPrefix('api/v1');
 
-    // Global Validation Pipe
+    // Global Validation Pipe (forbidNonWhitelisted set to false to accommodate third-party webhooks)
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
         transform: true,
-        forbidNonWhitelisted: true,
+        forbidNonWhitelisted: false,
         transformOptions: {
           enableImplicitConversion: true,
         },

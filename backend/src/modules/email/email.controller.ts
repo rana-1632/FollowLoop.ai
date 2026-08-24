@@ -164,7 +164,7 @@ export class EmailController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Public Inbound Email Webhook (Tracks incoming replies & transitions stage to REPLIED)' })
   @ApiResponse({ status: 200, description: 'Inbound email webhook processed successfully' })
-  async handleInboundWebhook(@Body() dto: InboundWebhookDto) {
+  async handleInboundWebhook(@Body() dto: any) {
     return this.emailService.handleInboundWebhook(dto);
   }
 }
