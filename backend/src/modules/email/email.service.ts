@@ -464,10 +464,11 @@ export class EmailService implements OnApplicationBootstrap {
       // Platform System Email or Resend fallback
       const isPublicDomain = userEmail ? /@(gmail|yahoo|hotmail|outlook|icloud)\.com$/i.test(userEmail) : true;
       const resendFrom = isPublicDomain ? this.defaultFromEmail : senderIdentity;
-      const replyToEmails = userEmail ? [userEmail] : undefined;
+      const inboundAddress = process.env.RESEND_INBOUND_EMAIL || 'inbound@fleniiielda.resend.app';
+      const replyToEmails = userEmail && userEmail !== inboundAddress ? [inboundAddress, userEmail] : [inboundAddress];
 
       try {
-        this.logger.log(`Dispatching email via Resend API | From: "${resendFrom}" (ReplyTo: "${userEmail}") -> To: "${recipientFormatted}"`);
+        this.logger.log(`Dispatching email via Resend API | From: "${resendFrom}" (ReplyTo: "${replyToEmails.join(', ')}") -> To: "${recipientFormatted}"`);
         const resendResponse = await this.resendClient.emails.send({
           from: resendFrom,
           reply_to: replyToEmails,
@@ -652,7 +653,11 @@ export class EmailService implements OnApplicationBootstrap {
 
     if (!contact) {
       const allContacts = await this.prisma.contact.findMany({ include: { user: true } });
-      contact = allContacts.find((c) => c.email && c.email.trim().toLowerCase() === senderEmail) || null;
+      contact = allContacts.find((c) => {
+        if (!c.email) return false;
+        const dbEmail = c.email.trim().toLowerCase();
+        return dbEmail === senderEmail || senderEmail.includes(dbEmail) || dbEmail.includes(senderEmail);
+      }) || null;
     }
 
     if (contact) {

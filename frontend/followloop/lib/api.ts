@@ -848,6 +848,22 @@ export const api = {
     },
   },
 
+  // Email API & Inbound Webhooks
+  email: {
+    async triggerInboundWebhook(dto: {
+      from: string;
+      to: string;
+      subject: string;
+      text?: string;
+      html?: string;
+    }): Promise<any> {
+      return request<any>("/emails/webhook/inbound", {
+        method: "POST",
+        body: JSON.stringify(dto),
+      });
+    },
+  },
+
   // Diagnostics & System Health
   diagnostics: {
     async checkEmailHealth(): Promise<any> {

@@ -161,6 +161,29 @@ export default function LeadDetailModal({
     }
   };
 
+  const handleSimulateInboundReply = async () => {
+    if (!contact || !contact.email) return;
+    setSendingReply(true);
+    setReplyError(null);
+    try {
+      await api.email.triggerInboundWebhook({
+        from: contact.email,
+        to: "inbound@fleniiielda.resend.app",
+        subject: `Re: Follow-up with ${contact.name}`,
+        text: `Hi! Thanks for reaching out. I reviewed your offer and I'd love to schedule a demo call with your team next week.`,
+      });
+      setReplySuccess(`Simulated inbound reply from ${contact.name}! Lead stage updated to REPLIED.`);
+      invalidateApiCache();
+      if (onContactUpdated) onContactUpdated();
+      await loadLeadData(true);
+      setTimeout(() => setReplySuccess(null), 4000);
+    } catch (err: any) {
+      setReplyError(err.message || "Failed to trigger inbound reply simulation.");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -208,6 +231,17 @@ export default function LeadDetailModal({
             </div>
 
             <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              {contact && contact.status !== "Replied" && (
+                <button
+                  onClick={handleSimulateInboundReply}
+                  disabled={sendingReply}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border shadow-soft bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 disabled:opacity-50"
+                  title="Trigger a simulated inbound reply to update stage to REPLIED and test dashboard triggers"
+                >
+                  <Sparkles size={12} className="text-purple-600 animate-pulse" />
+                  {sendingReply ? "Triggering..." : "Simulate Inbound Reply"}
+                </button>
+              )}
               {contact && (
                 <button
                   onClick={handleToggleSequence}
