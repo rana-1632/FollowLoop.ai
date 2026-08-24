@@ -54,6 +54,7 @@ export default function LeadDetailModal({
   const [replyBody, setReplyBody] = useState<string>("");
   const [replySuccess, setReplySuccess] = useState<string | null>(null);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [isSubjectEdited, setIsSubjectEdited] = useState<boolean>(false);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -84,10 +85,14 @@ export default function LeadDetailModal({
       if (threadRes.status === "fulfilled" && Array.isArray(threadRes.value.messages)) {
         const msgs = threadRes.value.messages;
         setMessages(msgs);
-        if (msgs.length > 0 && !replySubject) {
+
+        // Pre-fill subject ONLY on initial non-background fetch and ONLY if user hasn't edited it
+        if (!isBackground && !isSubjectEdited && msgs.length > 0) {
           const lastMsg = msgs[msgs.length - 1];
           const lastSubj = lastMsg.subject || "";
-          setReplySubject(lastSubj.startsWith("Re:") ? lastSubj : `Re: ${lastSubj}`);
+          if (lastSubj) {
+            setReplySubject(lastSubj.startsWith("Re:") ? lastSubj : `Re: ${lastSubj}`);
+          }
         }
       } else if (!isBackground) {
         setMessages([]);
@@ -101,6 +106,16 @@ export default function LeadDetailModal({
 
   useEffect(() => {
     if (isOpen && contactId) {
+      // Immediately reset modal state so previous lead's details & messages never leak or merge
+      setContact(null);
+      setTimeline([]);
+      setMessages([]);
+      setReplySubject("");
+      setReplyBody("");
+      setReplySuccess(null);
+      setReplyError(null);
+      setIsSubjectEdited(false);
+
       loadLeadData(false);
       const pollInterval = setInterval(() => {
         loadLeadData(true);
@@ -404,7 +419,10 @@ export default function LeadDetailModal({
                         type="text"
                         placeholder="Subject Line"
                         value={replySubject}
-                        onChange={(e) => setReplySubject(e.target.value)}
+                        onChange={(e) => {
+                          setReplySubject(e.target.value);
+                          setIsSubjectEdited(true);
+                        }}
                         className="input-field text-xs bg-canvas"
                       />
                     </div>
