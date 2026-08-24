@@ -673,51 +673,8 @@ export class EmailService implements OnApplicationBootstrap {
         },
       });
 
-      // 4. Real-time User Notification System (Reply Alert using FRONTEND_URL env var)
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      if (contact.user && contact.user.email) {
-        try {
-          const notifySubject = `[FollowLoop Alert] New Email Reply Received from ${contact.name}`;
-          const dashboardUrl = `${frontendUrl.replace(/\/$/, '')}/dashboard`;
-          const notifyHtml = `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
-              <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 18px; border-radius: 12px; text-align: center; color: #ffffff; font-weight: 700; font-size: 18px;">
-                ⚡ FollowLoop.ai — Inbound Reply Alert
-              </div>
-              <div style="padding: 24px 4px 8px 4px;">
-                <h2 style="color: #0f172a; font-size: 16px; font-weight: 700; margin-bottom: 12px;">Great news! ${contact.name} just replied to your automated sequence.</h2>
-                <p style="color: #475569; font-size: 13px; margin-bottom: 16px; line-height: 1.6;">
-                  <strong>Lead Sender:</strong> ${senderEmail}<br/>
-                  <strong>Company:</strong> ${contact.company || 'N/A'}<br/>
-                  <strong>Subject Line:</strong> ${emailSubject}
-                </p>
-                <div style="background-color: #f8fafc; padding: 16px; border-left: 4px solid #7c3aed; border-radius: 8px; font-size: 13px; color: #334155; white-space: pre-wrap; margin-bottom: 20px;">
-                  "${(bodyContent || 'No content payload').trim()}"
-                </div>
-                <p style="text-align: center; margin-top: 24px;">
-                  <a href="${dashboardUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 13px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">
-                    View Conversation & Continue Sequence &rarr;
-                  </a>
-                </p>
-              </div>
-            </div>
-          `;
-
-          if (this.resendClient) {
-            await this.resendClient.emails.send({
-              from: this.defaultFromEmail,
-              to: [contact.user.email],
-              subject: notifySubject,
-              html: notifyHtml,
-            });
-            this.logger.log(`Real-time reply notification sent via Resend to user: ${contact.user.email}`);
-          } else {
-            this.logger.log(`Simulated reply notification alert dispatched to user: ${contact.user.email}`);
-          }
-        } catch (notifyErr: any) {
-          this.logger.warn(`Failed to dispatch real-time reply notification to user: ${notifyErr.message}`);
-        }
-      }
+      // 4. Log successful reply match & CRM status update (notification email omitted as user receives reply directly)
+      this.logger.log(`Inbound reply processed for lead ${contact.name} (${senderEmail}). Stage updated to REPLIED and pending tasks cancelled.`);
 
       return {
         matched: true,
