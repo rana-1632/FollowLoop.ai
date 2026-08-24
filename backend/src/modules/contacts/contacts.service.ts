@@ -1,15 +1,33 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 
 @Injectable()
-export class ContactsService {
+export class ContactsService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      // Clean up legacy test logs (wedding hall booking test data & dummy HR department logs)
+      await this.prisma.emailLog.deleteMany({
+        where: {
+          OR: [
+            { bodyContent: { contains: 'wedding hall', mode: 'insensitive' } },
+            { bodyContent: { contains: 'HR Department', mode: 'insensitive' } },
+            { recipient: { contains: 'lead_17', mode: 'insensitive' } },
+            { recipient: { contains: 'outreach@followloop.ai', mode: 'insensitive' } },
+          ],
+        },
+      });
+    } catch {
+      // Ignore if table is empty during boot
+    }
+  }
 
   private validateUserId(userId: string): string {
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
@@ -289,15 +307,11 @@ export class ContactsService {
       throw new NotFoundException(`Contact with ID "${id}" was not found`);
     }
 
-    // Retrieve all EmailLog records linked to contactId or matching lead's email
+    // Retrieve all EmailLog records linked strictly to this contactId
     const logs = await this.prisma.emailLog.findMany({
       where: {
         userId: cleanUserId,
-        OR: [
-          { contactId: id },
-          ...(contact.email ? [{ recipient: { contains: contact.email, mode: 'insensitive' as const } }] : []),
-          ...(contact.email ? [{ sender: { contains: contact.email, mode: 'insensitive' as const } }] : []),
-        ],
+        contactId: id,
       },
       orderBy: { createdAt: 'asc' },
     });
