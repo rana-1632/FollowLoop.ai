@@ -23,7 +23,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Contact, ContactStatus, statusStyles } from "@/lib/data";
-import { api } from "@/lib/api";
+import { api, invalidateApiCache } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
 
@@ -59,10 +59,12 @@ export default function LeadDetailModal({
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  const loadLeadData = async () => {
+  const loadLeadData = async (isBackground = false) => {
     if (!contactId) return;
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
+      if (isBackground) invalidateApiCache();
+
       const [contactRes, timelineRes, threadRes] = await Promise.allSettled([
         api.contacts.getOne(contactId),
         api.contacts.getTimeline(contactId),
@@ -75,31 +77,35 @@ export default function LeadDetailModal({
 
       if (timelineRes.status === "fulfilled" && Array.isArray(timelineRes.value.timeline)) {
         setTimeline(timelineRes.value.timeline);
-      } else {
+      } else if (!isBackground) {
         setTimeline([]);
       }
 
       if (threadRes.status === "fulfilled" && Array.isArray(threadRes.value.messages)) {
         const msgs = threadRes.value.messages;
         setMessages(msgs);
-        if (msgs.length > 0) {
+        if (msgs.length > 0 && !replySubject) {
           const lastMsg = msgs[msgs.length - 1];
           const lastSubj = lastMsg.subject || "";
           setReplySubject(lastSubj.startsWith("Re:") ? lastSubj : `Re: ${lastSubj}`);
         }
-      } else {
+      } else if (!isBackground) {
         setMessages([]);
       }
     } catch (err) {
       console.warn("Could not load lead detail data:", err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (isOpen && contactId) {
-      loadLeadData();
+      loadLeadData(false);
+      const pollInterval = setInterval(() => {
+        loadLeadData(true);
+      }, 5000);
+      return () => clearInterval(pollInterval);
     }
   }, [isOpen, contactId]);
 

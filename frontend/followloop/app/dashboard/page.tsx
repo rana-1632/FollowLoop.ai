@@ -26,17 +26,19 @@ import OnboardingBanner from "@/components/dashboard/OnboardingBanner";
 import ReplyNotificationBanner from "@/components/dashboard/ReplyNotificationBanner";
 import LeadDetailModal from "@/components/dashboard/LeadDetailModal";
 import { Contact, ContactStatus } from "@/lib/data";
-import { api } from "@/lib/api";
+import { api, invalidateApiCache } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useLayout } from "@/lib/layout-context";
 
 export default function DashboardPage() {
   const { isCollapsed } = useLayout();
   const [view, setView] = useState<"table" | "kanban">("table");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // CRM Contacts, Tasks & Analytics State
   const [contactsList, setContactsList] = useState<Contact[]>([]);
   const [tasksList, setTasksList] = useState<any[]>([]);
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
   // Profile Modal & Email Accounts Modal & New Contact Modal & Lead Detail Modal State
@@ -57,10 +59,12 @@ export default function DashboardPage() {
   });
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Fetch real data from NestJS Backend API
-  const fetchDashboardData = async () => {
+  // Fetch real data from NestJS Backend API (supports silent background polling)
+  const fetchDashboardData = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
+      if (isBackground) invalidateApiCache();
+
       const [contactsData, tasksData, logsData] = await Promise.allSettled([
         api.contacts.getAll(),
         api.tasks.getAll(),
@@ -73,33 +77,40 @@ export default function DashboardPage() {
           (c: any) => c && c.name && c.name !== "HR Department" && c.name !== "HR"
         );
         setContactsList(cleaned);
-      } else {
+      } else if (!isBackground) {
         setContactsList([]);
       }
 
       if (tasksData.status === "fulfilled" && Array.isArray(tasksData.value)) {
         setTasksList(tasksData.value);
-      } else {
+      } else if (!isBackground) {
         setTasksList([]);
       }
 
       if (logsData.status === "fulfilled" && Array.isArray(logsData.value)) {
         setEmailLogs(logsData.value);
-      } else {
+      } else if (!isBackground) {
         setEmailLogs([]);
       }
     } catch (err) {
       console.warn("Could not fetch backend dashboard data:", err);
-      setContactsList([]);
-      setTasksList([]);
-      setEmailLogs([]);
+      if (!isBackground) {
+        setContactsList([]);
+        setTasksList([]);
+        setEmailLogs([]);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboardData(false);
+
+    // Auto-poll backend every 5 seconds for real-time inbound replies & CRM stage triggers
+    const pollInterval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 5000);
 
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -108,6 +119,8 @@ export default function DashboardPage() {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const handleStatusChange = async (id: string, newStatus: ContactStatus) => {

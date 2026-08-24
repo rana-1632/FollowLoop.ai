@@ -573,11 +573,16 @@ export class EmailService implements OnApplicationBootstrap {
    * Fetches full email content via Resend SDK if email_id is present, matches sender case-insensitively,
    * updates contact stage to REPLIED, cancels pending tasks, logs audit record, and dispatches user alert.
    */
+  /**
+   * Process Inbound Email Webhook (Supports Resend 'email.received' webhook & direct payload)
+   * Fetches full email content via Resend SDK if email_id is present, matches sender case-insensitively,
+   * updates contact stage to REPLIED, cancels pending tasks, logs audit record, and returns update summary.
+   */
   async handleInboundWebhook(dto: InboundWebhookDto) {
     this.logger.log(`Received Inbound Webhook payload: ${JSON.stringify(dto)}`);
 
-    // 1. Extract email_id from Resend event data structure (event.data.email_id) or top-level email_id
-    const emailId = dto.data?.email_id || dto.email_id;
+    // 1. Extract email_id from Resend event data structure (event.data.email_id / event.data.id) or top-level
+    const emailId = dto.data?.email_id || (dto.data as any)?.id || dto.email_id || (dto as any)?.id;
     let fetchedEmail: any = null;
 
     // 2. Fetch full email content using Resend SDK if email_id is present
@@ -600,20 +605,29 @@ export class EmailService implements OnApplicationBootstrap {
       }
     }
 
-    // 3. Extract sender email (support array/string, angle brackets, fetched or dto)
-    let rawFrom = fetchedEmail?.from || dto.data?.from || dto.from;
+    // 3. Extract sender display & clean email address (support array/object/string, angle brackets)
+    const rawFrom = fetchedEmail?.from || dto.data?.from || dto.from;
+    let senderDisplay = '';
     if (Array.isArray(rawFrom)) {
-      rawFrom = rawFrom[0] || '';
+      const first = rawFrom[0];
+      senderDisplay = typeof first === 'string' ? first : first?.email || first?.address || String(first || '');
+    } else if (typeof rawFrom === 'object' && rawFrom !== null) {
+      senderDisplay = (rawFrom as any).email || (rawFrom as any).address || JSON.stringify(rawFrom);
+    } else {
+      senderDisplay = String(rawFrom || '');
     }
-    const senderDisplay = typeof rawFrom === 'string' ? rawFrom : String(rawFrom || '');
-    const senderEmail = senderDisplay.includes('<')
-      ? senderDisplay.match(/<([^>]+)>/)?.[1] || senderDisplay
-      : senderDisplay.trim();
+
+    let senderEmail = senderDisplay;
+    if (senderEmail.includes('<') && senderEmail.includes('>')) {
+      const match = senderEmail.match(/<([^>]+)>/);
+      if (match && match[1]) senderEmail = match[1];
+    }
+    senderEmail = senderEmail.replace(/['"]/g, '').trim().toLowerCase();
 
     // 4. Extract recipient email
     let rawTo = fetchedEmail?.to || dto.data?.to || dto.to;
     if (Array.isArray(rawTo)) {
-      rawTo = rawTo.join(', ');
+      rawTo = rawTo.map((item: any) => (typeof item === 'string' ? item : item?.email || item?.address || String(item))).join(', ');
     }
     const recipientDisplay = typeof rawTo === 'string' ? rawTo : String(rawTo || 'inbound@fleniiielda.resend.app');
 
@@ -630,11 +644,16 @@ export class EmailService implements OnApplicationBootstrap {
 
     this.logger.log(`Processing inbound reply from: "${senderEmail}" (Display: "${senderDisplay}") to: "${recipientDisplay}" | Subject: "${emailSubject}"`);
 
-    // Match sender back to a contact in the PostgreSQL CRM case-insensitively
-    const contact = await this.prisma.contact.findFirst({
+    // Match sender back to a contact in the PostgreSQL CRM case-insensitively & trimmed
+    let contact = await this.prisma.contact.findFirst({
       where: { email: { equals: senderEmail, mode: 'insensitive' } },
       include: { user: true },
     });
+
+    if (!contact) {
+      const allContacts = await this.prisma.contact.findMany({ include: { user: true } });
+      contact = allContacts.find((c) => c.email && c.email.trim().toLowerCase() === senderEmail) || null;
+    }
 
     if (contact) {
       this.logger.log(`Inbound email matched contact ID: ${contact.id} (${contact.name})`);
@@ -664,7 +683,7 @@ export class EmailService implements OnApplicationBootstrap {
         data: {
           userId: contact.userId,
           contactId: contact.id,
-          sender: senderDisplay,
+          sender: senderDisplay || senderEmail,
           recipient: recipientDisplay,
           subject: emailSubject,
           bodyContent: bodyContent,
@@ -673,7 +692,7 @@ export class EmailService implements OnApplicationBootstrap {
         },
       });
 
-      // 4. Log successful reply match & CRM status update (notification email omitted as user receives reply directly)
+      // 4. Log successful reply match & CRM status update
       this.logger.log(`Inbound reply processed for lead ${contact.name} (${senderEmail}). Stage updated to REPLIED and pending tasks cancelled.`);
 
       return {
