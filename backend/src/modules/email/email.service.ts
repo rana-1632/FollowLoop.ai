@@ -569,17 +569,68 @@ export class EmailService implements OnApplicationBootstrap {
   }
 
   /**
-   * Process Inbound Email Webhook (Inbound Reply Tracking)
-   * Matches incoming reply to CRM contact, updates currentStage to REPLIED, and logs audit record.
+   * Process Inbound Email Webhook (Supports Resend 'email.received' webhook & direct payload)
+   * Fetches full email content via Resend SDK if email_id is present, matches sender case-insensitively,
+   * updates contact stage to REPLIED, cancels pending tasks, logs audit record, and dispatches user alert.
    */
   async handleInboundWebhook(dto: InboundWebhookDto) {
-    this.logger.log(`Received Inbound Webhook payload from: ${dto.from} for ${dto.to}`);
+    this.logger.log(`Received Inbound Webhook payload: ${JSON.stringify(dto)}`);
 
-    const senderEmail = dto.from.includes('<')
-      ? dto.from.match(/<([^>]+)>/)?.[1] || dto.from
-      : dto.from.trim();
+    // 1. Extract email_id from Resend event data structure (event.data.email_id) or top-level email_id
+    const emailId = dto.data?.email_id || dto.email_id;
+    let fetchedEmail: any = null;
 
-    // Match sender back to a contact in the PostgreSQL CRM
+    // 2. Fetch full email content using Resend SDK if email_id is present
+    if (emailId && this.resendClient) {
+      try {
+        this.logger.log(`Fetching full inbound email content from Resend SDK for email_id: ${emailId}`);
+        const resendEmailsAny = this.resendClient.emails as any;
+        if (resendEmailsAny?.receiving?.get) {
+          const res = await resendEmailsAny.receiving.get(emailId);
+          fetchedEmail = res?.data || res;
+        } else if (typeof this.resendClient.emails.get === 'function') {
+          const res = await this.resendClient.emails.get(emailId);
+          fetchedEmail = res?.data || res;
+        }
+        if (fetchedEmail) {
+          this.logger.log(`Successfully fetched inbound email details from Resend API for ID ${emailId}`);
+        }
+      } catch (fetchErr: any) {
+        this.logger.warn(`Failed to fetch inbound email content from Resend for email_id "${emailId}": ${fetchErr.message}`);
+      }
+    }
+
+    // 3. Extract sender email (support array/string, angle brackets, fetched or dto)
+    let rawFrom = fetchedEmail?.from || dto.data?.from || dto.from;
+    if (Array.isArray(rawFrom)) {
+      rawFrom = rawFrom[0] || '';
+    }
+    const senderDisplay = typeof rawFrom === 'string' ? rawFrom : String(rawFrom || '');
+    const senderEmail = senderDisplay.includes('<')
+      ? senderDisplay.match(/<([^>]+)>/)?.[1] || senderDisplay
+      : senderDisplay.trim();
+
+    // 4. Extract recipient email
+    let rawTo = fetchedEmail?.to || dto.data?.to || dto.to;
+    if (Array.isArray(rawTo)) {
+      rawTo = rawTo.join(', ');
+    }
+    const recipientDisplay = typeof rawTo === 'string' ? rawTo : String(rawTo || 'inbound@fleniiielda.resend.app');
+
+    // 5. Extract subject and body
+    const emailSubject = fetchedEmail?.subject || dto.data?.subject || dto.subject || 'Inbound Reply';
+    const emailText = fetchedEmail?.text || dto.data?.text || dto.text || '';
+    const emailHtml = fetchedEmail?.html || dto.data?.html || dto.html || '';
+    const bodyContent = emailText || emailHtml || '';
+
+    if (!senderEmail) {
+      this.logger.warn('Inbound webhook payload missing sender email address.');
+      return { matched: false, message: 'Missing sender email address in payload.' };
+    }
+
+    this.logger.log(`Processing inbound reply from: "${senderEmail}" (Display: "${senderDisplay}") to: "${recipientDisplay}" | Subject: "${emailSubject}"`);
+
+    // Match sender back to a contact in the PostgreSQL CRM case-insensitively
     const contact = await this.prisma.contact.findFirst({
       where: { email: { equals: senderEmail, mode: 'insensitive' } },
       include: { user: true },
@@ -613,19 +664,21 @@ export class EmailService implements OnApplicationBootstrap {
         data: {
           userId: contact.userId,
           contactId: contact.id,
-          sender: dto.from,
-          recipient: dto.to,
-          subject: dto.subject,
-          bodyContent: dto.text || dto.html || '',
+          sender: senderDisplay,
+          recipient: recipientDisplay,
+          subject: emailSubject,
+          bodyContent: bodyContent,
           direction: 'INBOUND',
           status: EmailStatus.REPLIED,
         },
       });
 
-      // 4. Real-time User Notification System (Reply Alert)
+      // 4. Real-time User Notification System (Reply Alert using FRONTEND_URL env var)
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       if (contact.user && contact.user.email) {
         try {
           const notifySubject = `[FollowLoop Alert] New Email Reply Received from ${contact.name}`;
+          const dashboardUrl = `${frontendUrl.replace(/\/$/, '')}/dashboard`;
           const notifyHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
               <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 18px; border-radius: 12px; text-align: center; color: #ffffff; font-weight: 700; font-size: 18px;">
@@ -636,13 +689,13 @@ export class EmailService implements OnApplicationBootstrap {
                 <p style="color: #475569; font-size: 13px; margin-bottom: 16px; line-height: 1.6;">
                   <strong>Lead Sender:</strong> ${senderEmail}<br/>
                   <strong>Company:</strong> ${contact.company || 'N/A'}<br/>
-                  <strong>Subject Line:</strong> ${dto.subject}
+                  <strong>Subject Line:</strong> ${emailSubject}
                 </p>
                 <div style="background-color: #f8fafc; padding: 16px; border-left: 4px solid #7c3aed; border-radius: 8px; font-size: 13px; color: #334155; white-space: pre-wrap; margin-bottom: 20px;">
-                  "${(dto.text || dto.html || 'No content payload').trim()}"
+                  "${(bodyContent || 'No content payload').trim()}"
                 </div>
                 <p style="text-align: center; margin-top: 24px;">
-                  <a href="http://localhost:3000/dashboard" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 13px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">
+                  <a href="${dashboardUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 13px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">
                     View Conversation & Continue Sequence &rarr;
                   </a>
                 </p>
