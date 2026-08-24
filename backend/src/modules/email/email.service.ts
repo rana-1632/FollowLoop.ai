@@ -660,6 +660,27 @@ export class EmailService implements OnApplicationBootstrap {
       }) || null;
     }
 
+    if (!contact) {
+      this.logger.log(`No existing contact matched sender "${senderEmail}". Auto-creating new Contact in stage REPLIED.`);
+      const defaultUser = await this.prisma.user.findFirst();
+      if (defaultUser) {
+        const fallbackName = senderDisplay && !senderDisplay.includes('@')
+          ? senderDisplay
+          : senderEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        contact = await this.prisma.contact.create({
+          data: {
+            userId: defaultUser.id,
+            name: fallbackName || 'Inbound Lead',
+            email: senderEmail,
+            company: 'Inbound Inquiry',
+            currentStage: 'REPLIED',
+            lastInteractionDate: new Date(),
+          },
+          include: { user: true },
+        });
+      }
+    }
+
     if (contact) {
       this.logger.log(`Inbound email matched contact ID: ${contact.id} (${contact.name})`);
 
@@ -710,10 +731,10 @@ export class EmailService implements OnApplicationBootstrap {
         emailLogId: emailLog.id,
       };
     } else {
-      this.logger.warn(`Inbound email from ${senderEmail} did not match any known CRM contact.`);
+      this.logger.warn(`Inbound email from ${senderEmail} could not create or match a contact.`);
       return {
         matched: false,
-        message: `No matching contact found for email address: ${senderEmail}`,
+        message: `Unable to process contact for email address: ${senderEmail}`,
       };
     }
   }

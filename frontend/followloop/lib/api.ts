@@ -348,23 +348,23 @@ async function request<T>(
 
 export function normalizeContact(raw: any): Contact {
   if (!raw) return raw;
+
+  const rawStage = (raw.currentStage || raw.status || "New Lead").toString().trim();
+  const normalizedKey = rawStage.toUpperCase().replace(/\s+/g, "_");
+
   const statusMap: Record<string, ContactStatus> = {
     LEAD: "New Lead",
+    NEW_LEAD: "New Lead",
     IN_SEQUENCE: "In Sequence",
+    INSEQUENCE: "In Sequence",
     AWAITING_REPLY: "Awaiting Reply",
+    AWAITINGREPLY: "Awaiting Reply",
     REPLIED: "Replied",
     BOOKED: "Booked",
     STALLED: "Stalled",
-    "New Lead": "New Lead",
-    "In Sequence": "In Sequence",
-    "Awaiting Reply": "Awaiting Reply",
-    Replied: "Replied",
-    Booked: "Booked",
-    Stalled: "Stalled",
   };
 
-  const currentStage = raw.currentStage || raw.status || "New Lead";
-  const mappedStatus: ContactStatus = statusMap[currentStage] || (currentStage as ContactStatus) || "New Lead";
+  const mappedStatus: ContactStatus = statusMap[normalizedKey] || (rawStage as ContactStatus) || "New Lead";
 
   let lastTouchStr = "—";
   if (raw.lastInteractionDate || raw.updatedAt || raw.createdAt) {
