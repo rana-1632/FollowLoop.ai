@@ -1,6 +1,6 @@
 import React, { memo } from "react";
 import { motion } from "framer-motion";
-import { Trash2, UserPlus, Users, Sparkles } from "lucide-react";
+import { Trash2, UserPlus, Users, MessageSquare } from "lucide-react";
 import { Contact, statusStyles } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -10,6 +10,7 @@ interface ContactsTableProps {
   onDelete?: (id: string) => void;
   onStatusChange?: (id: string, newStatus: any) => void;
   onAddContact?: () => void;
+  onSelectContact?: (id: string) => void;
 }
 
 function ContactsTable({
@@ -17,6 +18,7 @@ function ContactsTable({
   onDelete,
   onStatusChange,
   onAddContact,
+  onSelectContact,
 }: ContactsTableProps) {
   // Clean up legacy test entries like "HR Department" or "HR"
   const validContacts = contacts.filter(
@@ -66,18 +68,21 @@ function ContactsTable({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.4, delay: i * 0.04 }}
-                className="border-b border-border last:border-0 transition-colors hover:bg-surface-muted/40"
+                className="border-b border-border last:border-0 transition-colors hover:bg-surface-muted/40 group cursor-pointer"
+                onClick={() => onSelectContact && onSelectContact(contact.id)}
               >
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <UserAvatar name={contact.name} size="md" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{contact.name}</p>
+                      <p className="truncate text-sm font-semibold text-ink group-hover:text-accent-600 transition-colors">
+                        {contact.name}
+                      </p>
                       <p className="truncate text-xs text-ink-muted">{contact.company || contact.email}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                   <select
                     value={contact.status}
                     onChange={(e) => onStatusChange && onStatusChange(contact.id, e.target.value)}
@@ -114,16 +119,25 @@ function ContactsTable({
                     <span className="text-xs font-medium text-ink-muted">{contact.score || 50}</span>
                   </div>
                 </td>
-                <td className="px-5 py-3.5 text-right">
-                  {onDelete && (
+                <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-end gap-1">
                     <button
-                      onClick={() => onDelete(contact.id)}
-                      title="Delete Contact"
-                      className="rounded-lg p-1.5 text-ink-muted hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                      onClick={() => onSelectContact && onSelectContact(contact.id)}
+                      title="View Lead Thread & Timeline"
+                      className="rounded-lg p-1.5 text-accent-600 hover:bg-accent-50 transition-colors flex items-center gap-1 text-xs font-bold"
                     >
-                      <Trash2 size={15} />
+                      <MessageSquare size={15} /> Unibox
                     </button>
-                  )}
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(contact.id)}
+                        title="Delete Contact"
+                        className="rounded-lg p-1.5 text-ink-muted hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </motion.tr>
             ))}

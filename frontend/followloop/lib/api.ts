@@ -627,6 +627,53 @@ export const api = {
       });
       return normalizeContact(data);
     },
+
+    async getTimeline(id: string): Promise<{
+      contact: any;
+      timeline: Array<{
+        id: string;
+        type: string;
+        title: string;
+        description?: string;
+        timestamp: string;
+        badgeColor: string;
+        meta?: any;
+      }>;
+    }> {
+      return request<{
+        contact: any;
+        timeline: any[];
+      }>(`/contacts/${id}/timeline`);
+    },
+
+    async getThread(id: string): Promise<{
+      contact: any;
+      messages: Array<{
+        id: string;
+        direction: "OUTBOUND" | "INBOUND";
+        sender?: string;
+        recipient?: string;
+        subject?: string;
+        bodyContent?: string;
+        status?: string;
+        createdAt: string;
+      }>;
+    }> {
+      return request<{
+        contact: any;
+        messages: any[];
+      }>(`/contacts/${id}/thread`);
+    },
+
+    async sendReply(
+      id: string,
+      dto: { subject: string; bodyContent: string }
+    ): Promise<any> {
+      return request<any>(`/contacts/${id}/send-reply`, {
+        method: "POST",
+        body: JSON.stringify(dto),
+      });
+    },
   },
 
   // AI Sequence Generation & Parsing

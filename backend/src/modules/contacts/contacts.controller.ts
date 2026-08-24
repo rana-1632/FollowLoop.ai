@@ -51,6 +51,31 @@ export class ContactsController {
     return this.contactsService.findOne(userId, id);
   }
 
+  @Get(':id/timeline')
+  @ApiOperation({ summary: 'Get lead activity audit trail timeline' })
+  @ApiResponse({ status: 200, description: 'Chronological timeline of events returned' })
+  async getTimeline(@GetUser('id') userId: string, @Param('id') id: string) {
+    return this.contactsService.getTimeline(userId, id);
+  }
+
+  @Get(':id/thread')
+  @ApiOperation({ summary: 'Get unified conversation thread (Unibox messages)' })
+  @ApiResponse({ status: 200, description: 'Threaded messages array returned' })
+  async getThread(@GetUser('id') userId: string, @Param('id') id: string) {
+    return this.contactsService.getThread(userId, id);
+  }
+
+  @Post(':id/send-reply')
+  @ApiOperation({ summary: 'Send manual reply message inside Unibox thread' })
+  @ApiResponse({ status: 201, description: 'Manual reply dispatched and logged' })
+  async sendReply(
+    @GetUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: { subject: string; bodyContent: string },
+  ) {
+    return this.contactsService.sendReply(userId, id, dto);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update contact details or pipeline stage' })
   @ApiResponse({ status: 200, description: 'Contact updated successfully' })

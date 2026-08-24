@@ -1,11 +1,15 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 
 @Injectable()
 export class ContactsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private validateUserId(userId: string): string {
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
@@ -73,7 +77,7 @@ export class ContactsService {
         },
         emailLogs: {
           orderBy: { createdAt: 'desc' },
-          take: 10,
+          take: 20,
         },
       },
     });
@@ -156,5 +160,190 @@ export class ContactsService {
         data: { currentStage: 'In Sequence' },
       });
     }
+  }
+
+  /**
+   * Lead Activity Timeline (Audit Trail)
+   * Builds a chronological event history for a lead (creation, emails sent, replies received, sequence tasks, stage changes)
+   */
+  async getTimeline(userId: string, id: string) {
+    const cleanUserId = this.validateUserId(userId);
+    const contact = await this.prisma.contact.findFirst({
+      where: { id, userId: cleanUserId },
+      include: {
+        tasks: { orderBy: { createdAt: 'desc' } },
+        emailLogs: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID "${id}" was not found`);
+    }
+
+    const events: Array<{
+      id: string;
+      type: 'LEAD_CREATED' | 'SEQUENCE_ENROLLED' | 'EMAIL_DISPATCHED' | 'REPLY_RECEIVED' | 'STAGE_CHANGED' | 'TASK_SCHEDULED';
+      title: string;
+      description?: string;
+      timestamp: Date;
+      badgeColor: string;
+      meta?: any;
+    }> = [];
+
+    // 1. Lead Enrolled / Created
+    events.push({
+      id: `created_${contact.id}`,
+      type: 'LEAD_CREATED',
+      title: 'Lead Enrolled in FollowLoop CRM',
+      description: `Lead record created for ${contact.name} (${contact.company || 'Independent'})`,
+      timestamp: contact.createdAt,
+      badgeColor: 'blue',
+    });
+
+    // 2. Stage Change Events
+    if (contact.currentStage === 'REPLIED' && contact.lastInteractionDate) {
+      events.push({
+        id: `stage_replied_${contact.id}`,
+        type: 'STAGE_CHANGED',
+        title: 'Stage Updated: REPLIED',
+        description: `Lead replied to sequence. Stage automatically transitioned to REPLIED and remaining tasks paused.`,
+        timestamp: contact.lastInteractionDate,
+        badgeColor: 'emerald',
+      });
+    } else if (contact.lastInteractionDate) {
+      events.push({
+        id: `stage_touch_${contact.id}`,
+        type: 'STAGE_CHANGED',
+        title: `Pipeline Stage: ${contact.currentStage}`,
+        description: `Contact last interacted or updated stage to ${contact.currentStage}`,
+        timestamp: contact.lastInteractionDate,
+        badgeColor: 'purple',
+      });
+    }
+
+    // 3. Email Logs (Inbound & Outbound)
+    for (const log of contact.emailLogs) {
+      if (log.direction === 'INBOUND' || log.status === 'REPLIED') {
+        events.push({
+          id: `log_${log.id}`,
+          type: 'REPLY_RECEIVED',
+          title: `Inbound Reply Received: "${log.subject}"`,
+          description: log.bodyContent || 'No message text provided',
+          timestamp: log.createdAt,
+          badgeColor: 'emerald',
+          meta: { sender: log.sender, recipient: log.recipient },
+        });
+      } else {
+        events.push({
+          id: `log_${log.id}`,
+          type: 'EMAIL_DISPATCHED',
+          title: `Email Dispatched: "${log.subject}"`,
+          description: log.bodyContent || 'Outbound email sent via FollowLoop engine',
+          timestamp: log.createdAt,
+          badgeColor: 'indigo',
+          meta: { sender: log.sender, recipient: log.recipient, status: log.status },
+        });
+      }
+    }
+
+    // 4. Sequence Tasks
+    for (const task of contact.tasks) {
+      events.push({
+        id: `task_${task.id}`,
+        type: 'TASK_SCHEDULED',
+        title: `Sequence Step ${task.status === 'CANCELLED' ? '(Cancelled)' : '(Scheduled)'}: ${task.title || task.subjectLine || 'Follow-up Email'}`,
+        description: task.aiGeneratedContent || task.subjectLine || '',
+        timestamp: task.suggestedDate || task.createdAt,
+        badgeColor: task.status === 'CANCELLED' ? 'slate' : 'amber',
+        meta: { status: task.status, suggestedDate: task.suggestedDate },
+      });
+    }
+
+    // Sort timeline events chronologically (newest first)
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return {
+      contact: {
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        company: contact.company,
+        currentStage: contact.currentStage,
+        phone: contact.phone,
+      },
+      timeline: events,
+    };
+  }
+
+  /**
+   * Unified Conversation View (Unibox / Threading)
+   * Fetches all back-and-forth email messages for a lead in chronological order
+   */
+  async getThread(userId: string, id: string) {
+    const cleanUserId = this.validateUserId(userId);
+    const contact = await this.prisma.contact.findFirst({
+      where: { id, userId: cleanUserId },
+    });
+
+    if (!contact) {
+      throw new NotFoundException(`Contact with ID "${id}" was not found`);
+    }
+
+    // Retrieve all EmailLog records linked to contactId or matching lead's email
+    const logs = await this.prisma.emailLog.findMany({
+      where: {
+        userId: cleanUserId,
+        OR: [
+          { contactId: id },
+          ...(contact.email ? [{ recipient: { contains: contact.email, mode: 'insensitive' as const } }] : []),
+          ...(contact.email ? [{ sender: { contains: contact.email, mode: 'insensitive' as const } }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      contact: {
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        company: contact.company,
+        currentStage: contact.currentStage,
+      },
+      messages: logs.map((l) => ({
+        id: l.id,
+        direction: l.direction, // "OUTBOUND" | "INBOUND"
+        sender: l.sender || 'FollowLoop Engine',
+        recipient: l.recipient,
+        subject: l.subject,
+        bodyContent: l.bodyContent || '',
+        status: l.status,
+        createdAt: l.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * Send Manual Reply directly inside FollowLoop Unibox Thread
+   */
+  async sendReply(userId: string, id: string, dto: { subject: string; bodyContent: string }) {
+    const cleanUserId = this.validateUserId(userId);
+    const contact = await this.prisma.contact.findFirst({
+      where: { id, userId: cleanUserId },
+    });
+
+    if (!contact || !contact.email) {
+      throw new NotFoundException(`Valid contact with email was not found for ID "${id}"`);
+    }
+
+    if (!dto.bodyContent || dto.bodyContent.trim() === '') {
+      throw new BadRequestException('Reply message body cannot be empty.');
+    }
+
+    return this.emailService.sendEmail(cleanUserId, {
+      contactId: contact.id,
+      subject: dto.subject || `Re: Conversation with ${contact.name}`,
+      bodyContent: dto.bodyContent,
+    });
   }
 }

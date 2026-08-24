@@ -11,6 +11,7 @@ export interface Contact {
   name: string;
   company: string;
   email: string;
+  phone?: string;
   avatarSeed?: string;
   status: ContactStatus;
   lastTouch: string;

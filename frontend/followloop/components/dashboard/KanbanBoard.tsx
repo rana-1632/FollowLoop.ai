@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from "react";
 import { motion } from "framer-motion";
-import { User, Building, Sparkles } from "lucide-react";
+import { User, Building, MessageSquare } from "lucide-react";
 import { Contact, ContactStatus, kanbanColumns } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -9,6 +9,7 @@ interface KanbanBoardProps {
   contacts: Contact[];
   onStatusChange?: (id: string, newStatus: ContactStatus) => void;
   onAddContactToStatus?: (status: ContactStatus) => void;
+  onSelectContact?: (id: string) => void;
 }
 
 const columnMeta: Record<
@@ -57,6 +58,7 @@ function KanbanBoard({
   contacts = [],
   onStatusChange,
   onAddContactToStatus,
+  onSelectContact,
 }: KanbanBoardProps) {
   // Filter out any legacy invalid/fake entries like "HR Department"
   const validContacts = useMemo(
@@ -66,7 +68,7 @@ function KanbanBoard({
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4 pt-1 scrollbar-thin snap-x">
-      {kanbanColumns.map((col, colIndex) => {
+      {kanbanColumns.map((col) => {
         const items = validContacts.filter((c) => c.status === col.id);
         const meta = columnMeta[col.id] || columnMeta["New Lead"];
 
@@ -109,7 +111,7 @@ function KanbanBoard({
 
             {/* Cards Container */}
             <div className="flex-1 space-y-3 min-h-[160px]">
-              {items.map((contact, i) => (
+              {items.map((contact) => (
                 <motion.div
                   key={contact.id}
                   layout
@@ -117,7 +119,8 @@ function KanbanBoard({
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.15 }}
                   whileHover={{ y: -2 }}
-                  className="group relative cursor-grab rounded-2xl border border-border bg-surface p-4 shadow-soft transition-all hover:border-border-strong hover:shadow-card active:cursor-grabbing"
+                  onClick={() => onSelectContact && onSelectContact(contact.id)}
+                  className="group relative cursor-pointer rounded-2xl border border-border bg-surface p-4 shadow-soft transition-all hover:border-border-strong hover:shadow-card"
                 >
                   {/* Card Header */}
                   <div className="flex items-start justify-between gap-2">
@@ -151,19 +154,23 @@ function KanbanBoard({
                     </div>
                   )}
 
-                  {contact.status === "Replied" && (
-                    <div className="mt-3">
-                      <a
-                        href="/automation-builder"
-                        className="w-full py-1.5 px-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                      >
-                        <Sparkles size={12} /> Post-Reply Continuation &rarr;
-                      </a>
-                    </div>
-                  )}
+                  <div className="mt-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onSelectContact) onSelectContact(contact.id);
+                      }}
+                      className="w-full py-1.5 px-2.5 rounded-lg bg-accent-50 hover:bg-accent-100 text-accent-700 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors border border-accent-200"
+                    >
+                      <MessageSquare size={13} /> View Thread &amp; Audit Trail &rarr;
+                    </button>
+                  </div>
 
                   {/* Card Footer Status Move Dropdown */}
-                  <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px]">
+                  <div
+                    className="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[11px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <span className="text-ink-muted flex items-center gap-1">
                       {contact.lastTouch || "Recently"}
                     </span>

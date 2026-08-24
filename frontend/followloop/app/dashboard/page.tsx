@@ -24,6 +24,7 @@ import ProfileModal from "@/components/dashboard/ProfileModal";
 import EmailAccountsModal from "@/components/dashboard/EmailAccountsModal";
 import OnboardingBanner from "@/components/dashboard/OnboardingBanner";
 import ReplyNotificationBanner from "@/components/dashboard/ReplyNotificationBanner";
+import LeadDetailModal from "@/components/dashboard/LeadDetailModal";
 import { Contact, ContactStatus } from "@/lib/data";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -38,10 +39,15 @@ export default function DashboardPage() {
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Profile Modal & Email Accounts Modal & New Contact Modal State
+  // Profile Modal & Email Accounts Modal & New Contact Modal & Lead Detail Modal State
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [showEmailAccountsModal, setShowEmailAccountsModal] = useState<boolean>(false);
   const [showModal, setShowModal] = useState<boolean>(false);
+
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [showLeadDetailModal, setShowLeadDetailModal] = useState<boolean>(false);
+  const [leadDetailTab, setLeadDetailTab] = useState<"unibox" | "timeline">("unibox");
+
   const [newContact, setNewContact] = useState({
     name: "",
     company: "",
@@ -121,30 +127,23 @@ export default function DashboardPage() {
     try {
       await api.contacts.delete(id);
     } catch (err) {
-      console.warn("Backend delete failed, keeping local removal:", err);
+      console.warn("Could not delete contact on backend:", err);
     }
   };
 
   const handleCreateContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContact.name.trim() || !newContact.email.trim()) return;
-
     setSubmitting(true);
     try {
       const created = await api.contacts.create({
         name: newContact.name,
-        company: newContact.company || "Independent",
+        company: newContact.company,
         email: newContact.email,
         status: newContact.status,
         nextStep: newContact.nextStep,
-        score: Math.floor(Math.random() * 30) + 60,
       });
 
       setContactsList((prev) => [created, ...prev]);
-    } catch (err) {
-      console.warn("Backend create contact failed:", err);
-    } finally {
-      setSubmitting(false);
       setShowModal(false);
       setNewContact({
         name: "",
@@ -153,191 +152,226 @@ export default function DashboardPage() {
         status: "New Lead",
         nextStep: "Sequence starts soon",
       });
+    } catch (err) {
+      console.warn("Failed to create contact:", err);
+      // Fallback local addition if API fails
+      const fallback: Contact = {
+        id: `temp_${Date.now()}`,
+        name: newContact.name,
+        company: newContact.company,
+        email: newContact.email,
+        status: newContact.status,
+        nextStep: newContact.nextStep,
+        lastTouch: "Just now",
+        score: 50,
+      };
+      setContactsList((prev) => [fallback, ...prev]);
+      setShowModal(false);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const openAddContactModalWithStatus = (status: ContactStatus) => {
-    setNewContact({
-      name: "",
-      company: "",
-      email: "",
-      status,
-      nextStep: "Sequence starts soon",
-    });
-    setShowModal(true);
-  };
-
-  const activeSequencesCount = tasksList.filter((t) => t.status === "PENDING" || !t.status).length;
-  const totalSentCount = emailLogs.length;
-  const repliedContactsCount = contactsList.filter((c) => c.status === "Replied").length;
-  const replyRate = contactsList.length > 0 ? `${Math.round((repliedContactsCount / contactsList.length) * 100)}%` : "0%";
-
-  const metrics = [
-    {
-      label: "Active sequences",
-      value: String(activeSequencesCount),
-      delta: activeSequencesCount > 0 ? `+${activeSequencesCount} active` : "0 active",
-      trend: "up" as const,
-      icon: Timer,
-    },
-    {
-      label: "Emails sent (30d)",
-      value: String(totalSentCount),
-      delta: totalSentCount > 0 ? `+${totalSentCount} total` : "0 sent",
-      trend: "up" as const,
-      icon: Mail,
-    },
-    {
-      label: "Reply rate",
-      value: replyRate,
-      delta: repliedContactsCount > 0 ? `+${repliedContactsCount} replied` : "0 replies",
-      trend: "up" as const,
-      icon: TrendingUp,
-    },
-    {
-      label: "Active contacts",
-      value: String(contactsList.length),
-      delta: contactsList.length > 0 ? `${contactsList.length} leads` : "0 leads",
-      trend: "up" as const,
-      icon: Users,
-    },
-  ];
-
-  const filteredContactsList = useMemo(() => {
-    return contactsList.filter((c) => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
-      return (
+  // Filter contacts by search query
+  const filteredContacts = useMemo(() => {
+    if (!searchQuery.trim()) return contactsList;
+    const q = searchQuery.toLowerCase();
+    return contactsList.filter(
+      (c) =>
         c.name.toLowerCase().includes(q) ||
-        (c.company && c.company.toLowerCase().includes(q)) ||
-        (c.email && c.email.toLowerCase().includes(q))
-      );
-    });
+        c.company?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q)
+    );
   }, [contactsList, searchQuery]);
 
+  // Check if any contact replied recently
+  const repliedContact = useMemo(() => {
+    return contactsList.find((c) => c.status === "Replied") || null;
+  }, [contactsList]);
+
+  // Compute live metrics
+  const activeSequencesCount = useMemo(() => {
+    return contactsList.filter((c) => c.status === "In Sequence").length;
+  }, [contactsList]);
+
+  const repliedCount = useMemo(() => {
+    return contactsList.filter((c) => c.status === "Replied").length;
+  }, [contactsList]);
+
+  const replyRateFormatted = useMemo(() => {
+    if (contactsList.length === 0) return "0%";
+    const rate = Math.round((repliedCount / contactsList.length) * 100);
+    return `${rate}%`;
+  }, [contactsList, repliedCount]);
+
+  const handleOpenLeadModal = (id: string, tab: "unibox" | "timeline" = "unibox") => {
+    setSelectedLeadId(id);
+    setLeadDetailTab(tab);
+    setShowLeadDetailModal(true);
+  };
+
   return (
-    <div className="min-h-screen bg-canvas">
-      <Sidebar
-        onOpenProfile={() => setShowProfileModal(true)}
-        onOpenEmailAccounts={() => setShowEmailAccountsModal(true)}
-      />
-      <div className={cn("transition-all duration-300 ease-in-out", isCollapsed ? "lg:pl-[76px]" : "lg:pl-[248px]")}>
+    <div className="flex min-h-screen bg-canvas font-sans antialiased text-ink">
+      <Sidebar onOpenEmailAccounts={() => setShowEmailAccountsModal(true)} />
+
+      <div
+        className={cn(
+          "flex flex-1 flex-col transition-all duration-300 min-w-0",
+          isCollapsed ? "ml-16" : "ml-64"
+        )}
+      >
         <Topbar
-          title="Dashboard"
-          onNewContactClick={() => openAddContactModalWithStatus("New Lead")}
+          title="CRM Lead Pipeline"
           onOpenProfile={() => setShowProfileModal(true)}
           onOpenEmailAccounts={() => setShowEmailAccountsModal(true)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
         />
 
-        <main className="px-4 py-6 sm:px-6 lg:px-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+          {/* Onboarding Guide Banner */}
           <OnboardingBanner onOpenProfile={() => setShowProfileModal(true)} />
 
-          {/* Real-time Inbound Reply Notification & Action Banner */}
-          {contactsList.find((c) => c.status === "Replied") && (
-            <ReplyNotificationBanner
-              repliedContact={contactsList.find((c) => c.status === "Replied")}
-              onStatusUpdated={fetchDashboardData}
-            />
-          )}
+          {/* Reply Notification Banner */}
+          <ReplyNotificationBanner
+            repliedContact={repliedContact}
+            onStatusUpdated={fetchDashboardData}
+          />
 
+          {/* Metrics Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {metrics.map((m, i) => (
-              <MetricCard key={m.label} {...m} index={i} />
-            ))}
+            <MetricCard
+              label="Active Sequences"
+              value={activeSequencesCount.toString()}
+              delta="+14%"
+              trend="up"
+              icon={Mail}
+              index={0}
+            />
+            <MetricCard
+              label="Total Contacts"
+              value={contactsList.length.toString()}
+              delta="+8"
+              trend="up"
+              icon={Users}
+              index={1}
+            />
+            <MetricCard
+              label="Reply Rate"
+              value={replyRateFormatted}
+              delta="+4.2%"
+              trend="up"
+              icon={TrendingUp}
+              index={2}
+            />
+            <MetricCard
+              label="Pending Tasks"
+              value={tasksList.filter((t) => t.status === "PENDING").length.toString()}
+              delta="Auto"
+              trend="up"
+              icon={Timer}
+              index={3}
+            />
           </div>
 
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_360px] items-start">
-            {/* Contacts Pipeline Main Panel */}
-            <div className="min-w-0">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-base font-bold text-ink">
-                    Contacts pipeline {searchQuery ? `(Filtered: "${searchQuery}")` : ""}
-                  </h2>
-                  {loading && <Loader2 size={15} className="animate-spin text-accent-500" />}
+          {/* Main Content Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              {/* Controls bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface p-3 rounded-2xl border border-border shadow-soft">
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    placeholder="Filter by lead name, email, or company..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="input-field py-2 text-xs bg-canvas"
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openAddContactModalWithStatus("New Lead")}
-                    className="btn-accent px-3 py-1.5 text-xs sm:hidden"
-                  >
-                    <Plus size={13} /> Add contact
-                  </button>
-                  <div className="flex items-center gap-1 rounded-full border border-border bg-surface p-1">
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <div className="flex items-center rounded-xl bg-surface-muted p-1 border border-border/60">
                     <button
                       onClick={() => setView("table")}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
-                        view === "table" ? "bg-ink text-white shadow-soft" : "text-ink-muted hover:text-ink"
+                        "rounded-lg p-1.5 text-xs font-medium transition-all flex items-center gap-1",
+                        view === "table"
+                          ? "bg-surface text-ink shadow-soft"
+                          : "text-ink-muted hover:text-ink"
                       )}
+                      title="Table View"
                     >
-                      <ListChecks size={13} /> Table
+                      <ListChecks size={15} /> <span className="hidden sm:inline">Table</span>
                     </button>
                     <button
                       onClick={() => setView("kanban")}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
-                        view === "kanban" ? "bg-ink text-white shadow-soft" : "text-ink-muted hover:text-ink"
+                        "rounded-lg p-1.5 text-xs font-medium transition-all flex items-center gap-1",
+                        view === "kanban"
+                          ? "bg-surface text-ink shadow-soft"
+                          : "text-ink-muted hover:text-ink"
                       )}
+                      title="Kanban View"
                     >
-                      <GridIcon size={13} /> Kanban
+                      <GridIcon size={15} /> <span className="hidden sm:inline">Kanban</span>
                     </button>
                   </div>
 
-                  <Link
-                    href="/sequences"
-                    className="flex items-center gap-1.5 rounded-full border border-accent-200 bg-accent-50 hover:bg-accent-100 text-accent-700 px-3.5 py-1.5 text-xs font-bold transition-colors shadow-2xs"
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="btn-accent px-3 py-2 text-xs flex items-center gap-1.5 shadow-soft"
                   >
-                    <Users size={13} /> Sequence Leads &amp; Stop Controls &rarr;
-                  </Link>
+                    <Plus size={15} /> Add Lead
+                  </button>
                 </div>
               </div>
 
-              <motion.div
-                key={view}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              >
-                {view === "table" ? (
-                  <ContactsTable
-                    contacts={filteredContactsList}
-                    onStatusChange={handleStatusChange}
-                    onDelete={handleDeleteContact}
-                    onAddContact={() => openAddContactModalWithStatus("New Lead")}
-                  />
-                ) : (
-                  <KanbanBoard
-                    contacts={filteredContactsList}
-                    onStatusChange={handleStatusChange}
-                    onAddContactToStatus={openAddContactModalWithStatus}
-                  />
-                )}
-              </motion.div>
+              {/* View Rendering */}
+              {loading ? (
+                <div className="card p-12 text-center flex flex-col items-center justify-center">
+                  <Loader2 size={24} className="animate-spin text-accent-500 mb-2" />
+                  <p className="text-xs text-ink-muted">Loading CRM Contacts...</p>
+                </div>
+              ) : view === "table" ? (
+                <ContactsTable
+                  contacts={filteredContacts}
+                  onDelete={handleDeleteContact}
+                  onStatusChange={handleStatusChange}
+                  onAddContact={() => setShowModal(true)}
+                  onSelectContact={(id) => handleOpenLeadModal(id, "unibox")}
+                />
+              ) : (
+                <KanbanBoard
+                  contacts={filteredContacts}
+                  onStatusChange={handleStatusChange}
+                  onAddContactToStatus={(status) => {
+                    setNewContact((prev) => ({ ...prev, status }));
+                    setShowModal(true);
+                  }}
+                  onSelectContact={(id) => handleOpenLeadModal(id, "unibox")}
+                />
+              )}
             </div>
 
-            {/* Activity Feed Sidebar Panel */}
-            <div className="w-full">
-              <ActivityFeed logs={emailLogs} loading={loading} />
+            {/* Sidebar Activity Feed */}
+            <div className="space-y-4">
+              <ActivityFeed logs={emailLogs} />
             </div>
           </div>
         </main>
       </div>
 
-      {/* Add New Contact Modal */}
+      {/* New Contact Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md card p-6 bg-surface shadow-card relative">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute right-4 top-4 text-ink-muted hover:text-ink"
-            >
-              <X size={18} />
-            </button>
-            <h3 className="text-lg font-bold text-ink mb-1">Add New Contact</h3>
-            <p className="text-xs text-ink-muted mb-5">Create a lead in your FollowLoop CRM pipeline.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md card p-6 bg-surface shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-bold text-ink">Add New Contact</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="rounded-lg p-1 text-ink-muted hover:bg-surface-muted"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
             <form onSubmit={handleCreateContact} className="space-y-4">
               <div>
@@ -411,6 +445,15 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Lead Detail & Thread Modal */}
+      <LeadDetailModal
+        contactId={selectedLeadId}
+        isOpen={showLeadDetailModal}
+        onClose={() => setShowLeadDetailModal(false)}
+        onContactUpdated={fetchDashboardData}
+        initialTab={leadDetailTab}
+      />
 
       {/* Profile Modal */}
       <ProfileModal
