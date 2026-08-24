@@ -15,7 +15,7 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
-import { cn, toLocalISOString, getMinDateTime, formatDisplayDateTime } from "@/lib/utils";
+import { cn, toLocalISOString, getMinDateTime, formatDisplayDateTime, formatEmailBodyWithSignature } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 
 export interface SequenceStepData {
@@ -138,13 +138,8 @@ function SequenceStep({
 
   const senderName = user?.fullName || "Sales Outreach Team";
 
-  // Formatted Body & Signature
-  const rawBody = step.body || "";
-  const hasSignature =
-    rawBody.toLowerCase().includes("best regards") ||
-    rawBody.toLowerCase().includes("kind regards") ||
-    rawBody.toLowerCase().includes("sincerely");
-  const displayBody = hasSignature ? rawBody : `${rawBody.trim()}\n\nBest regards,\n${senderName}`;
+  // Formatted Body & Signature (using smart signature formatter)
+  const displayBody = formatEmailBodyWithSignature(step.body, senderName);
 
   // Clean Recipient Header Display
   const recipientDisplay =

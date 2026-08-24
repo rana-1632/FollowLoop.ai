@@ -61,3 +61,95 @@ export function formatDisplayDateTime(dtStr?: string): string {
     return dtStr;
   }
 }
+
+/**
+ * Detects whether an email body already contains a closing sign-off or signature block near the end.
+ */
+export function hasExistingSignature(bodyText: string): boolean {
+  if (!bodyText) return false;
+  const trimmed = bodyText.trim();
+  // Examine the last 250 characters of the body text
+  const lastChunk = trimmed.slice(-250).toLowerCase();
+
+  const signOffPatterns = [
+    /\b(best regards|kind regards|warm regards|regards|best|sincerely|thanks|thank you|cheers|best wishes|yours truly|respectfully|warmly|with appreciation)\b/i,
+  ];
+
+  return signOffPatterns.some((pattern) => pattern.test(lastChunk));
+}
+
+/**
+ * Cleans up brackets, placeholders, duplicate consecutive lines, and formats sign-off cleanly.
+ */
+export function cleanSignature(bodyText: string, nameToUse?: string): string {
+  if (!bodyText) return bodyText;
+  let text = bodyText;
+  const name = nameToUse?.trim() || "";
+
+  // 1. Remove bracketed contact placeholders like [Phone], [Email], [Phone] | [Email], etc.
+  text = text
+    .replace(/\[Phone\]\s*\|\s*\[Email\]/gi, "")
+    .replace(/\[(?:Phone|Email|Phone Number|Your Phone|Your Email|Your Title|Your Position|Company|Your Company|Website)(?:\/[^\]]+)?\]/gi, "")
+    .replace(/\[Phone\/Email\]/gi, "");
+
+  // 2. Replace name placeholders with actual sender name or clean bracket
+  if (name) {
+    text = text
+      .replace(/\[Your Name(?:\/[^\]]+)?\]/gi, name)
+      .replace(/\[Your (?:Full Name|Position|Title|Company)\]/gi, "")
+      .replace(/\[Sender Name\]/gi, name);
+  } else {
+    text = text.replace(/\[(?:Your Name|Sender Name)(?:\/[^\]]+)?\]/gi, "");
+  }
+
+  // 3. Remove consecutive duplicate lines (e.g. "Mohsin Ali\nMohsin Ali")
+  const lines = text.split("\n");
+  const cleanedLines: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const current = lines[i].trim();
+    const prev = cleanedLines.length > 0 ? cleanedLines[cleanedLines.length - 1].trim() : null;
+
+    if (current && prev && current.toLowerCase() === prev.toLowerCase()) {
+      continue;
+    }
+    cleanedLines.push(lines[i]);
+  }
+  text = cleanedLines.join("\n").trim();
+
+  // 4. If sender name is available and text ends with a sign-off without a name, append sender name on new line
+  if (name) {
+    const signoffEndRegex = /(Best regards,|Kind regards,|Warm regards,|Regards,|Sincerely,|Thanks,|Thank you,|Best,|Cheers,)\s*$/i;
+    if (signoffEndRegex.test(text)) {
+      text = text.replace(signoffEndRegex, `$1\n${name}`);
+    }
+  }
+
+  return text;
+}
+
+/**
+ * Returns formatted body text ensuring signature is present exactly once, without duplicating existing sign-offs.
+ */
+export function formatEmailBodyWithSignature(
+  rawBody: string,
+  senderName?: string,
+  senderCompany?: string
+): string {
+  if (!rawBody) return "";
+  const cleaned = cleanSignature(rawBody, senderName);
+
+  if (hasExistingSignature(cleaned)) {
+    return cleaned;
+  }
+
+  // Append signature cleanly if missing
+  const name = senderName?.trim() || "";
+  const company = senderCompany?.trim() || "";
+  const signatureLines = ["Best regards,"];
+  if (name) signatureLines.push(name);
+  if (company && company !== "Our Team" && company !== "FollowLoop Inc.") {
+    signatureLines.push(company);
+  }
+
+  return `${cleaned.trim()}\n\n${signatureLines.join("\n")}`;
+}

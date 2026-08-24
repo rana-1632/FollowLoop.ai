@@ -88,6 +88,7 @@ CRITICAL RULES FOR ENTITY EXTRACTION:
    - initialDraft (Step 1 - Day 0): Subject & body referencing specific details from the interaction note.
    - sequence1 (Step 2 - Day 3): Gentle check-in / bump message (recommendedDelayDays: 3).
    - sequence2 (Step 3 - Day 7): Value-add / walkthrough confirmation / soft break-up message (recommendedDelayDays: 4).
+8. Email Copy Formatting: Do NOT include raw bracket placeholders like [Phone], [Email], [Your Phone], [Website] or duplicate sign-offs. End emails cleanly with "Best regards,".
 
 Respond strictly in valid JSON format matching this exact schema:
 {
@@ -252,6 +253,8 @@ Your objective is to craft a 2-step automated follow-up sequence for a prospect 
 
 WRITING GUIDELINES:
 - Avoid generic corporate templates or unnatural robotic copy.
+- Do NOT include raw bracket placeholders like [Phone], [Email], [Your Phone], or [Website] in email copy.
+- End emails cleanly with "Best regards," without duplicating sign-offs or names.
 - Directly reference specific context from notes, pricing proposals, venue bookings, or meeting summaries.
 - Keep emails clear, natural, and human.
 

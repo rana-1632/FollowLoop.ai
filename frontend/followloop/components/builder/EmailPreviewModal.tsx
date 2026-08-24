@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail, Copy, Check, Send } from "lucide-react";
 import { useState } from "react";
 import { SequenceStepData } from "./SequenceStep";
+import { formatEmailBodyWithSignature } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 
 export default function EmailPreviewModal({
@@ -37,13 +38,8 @@ export default function EmailPreviewModal({
 
   const displayDate = step.scheduledDate || `Day ${step.day}`;
 
-  // Process body text into clean paragraphs & signature block
-  const rawBody = step.body || "";
-  const hasSignature = rawBody.toLowerCase().includes("best regards") || rawBody.toLowerCase().includes("kind regards") || rawBody.toLowerCase().includes("sincerely");
-
-  const formattedBodyText = hasSignature
-    ? rawBody
-    : `${rawBody.trim()}\n\nBest regards,\n${senderName}\n${senderCompany}`;
+  // Process body text into clean paragraphs & signature block using smart formatter
+  const formattedBodyText = formatEmailBodyWithSignature(step.body, senderName, senderCompany);
 
   const handleCopy = async () => {
     const fullText = `To: ${recipientDisplay}\nSubject: ${step.subject}\nScheduled Date: ${displayDate}\n\n${formattedBodyText}`;

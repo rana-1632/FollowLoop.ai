@@ -27,7 +27,7 @@ import ExtractedContactCard from "@/components/builder/ExtractedContactCard";
 import EmailPreviewModal from "@/components/builder/EmailPreviewModal";
 import { api, AiParseResponse, formatErrorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import { cn } from "@/lib/utils";
+import { cn, cleanSignature } from "@/lib/utils";
 import { useLayout } from "@/lib/layout-context";
 
 const SAMPLE_NOTES =
@@ -58,28 +58,6 @@ export default function AutomationBuilderPage() {
       setSenderName(user.fullName);
     }
   }, [user]);
-
-  // Clean signature helper to automatically replace [Your Name] and format sign-offs
-  const cleanSignature = (bodyText: string, nameToUse?: string): string => {
-    if (!bodyText) return bodyText;
-    const name = (nameToUse !== undefined ? nameToUse : senderName).trim();
-
-    // 1. Replace bracket placeholders
-    let text = bodyText
-      .replace(/\[Your Name(?:\/[^\]]+)?\]/gi, name || "[Your Name]")
-      .replace(/\[Your (?:Full Name|Position|Title|Company)\]/gi, name || "")
-      .replace(/\[Sender Name\]/gi, name || "[Your Name]");
-
-    // 2. If name is available, ensure it follows "Best regards," sign-offs
-    if (name) {
-      const signoffPattern = /(Best regards,|Warm regards,|Sincerely,|Thanks,|Best,)\s*(\[Your Name\])?\s*$/i;
-      if (signoffPattern.test(text)) {
-        text = text.replace(signoffPattern, `$1\n${name}`);
-      }
-    }
-
-    return text;
-  };
 
   const handleSenderNameChange = (newName: string) => {
     setSenderName(newName);
