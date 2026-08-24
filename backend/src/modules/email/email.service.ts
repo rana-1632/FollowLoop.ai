@@ -661,24 +661,11 @@ export class EmailService implements OnApplicationBootstrap {
     }
 
     if (!contact) {
-      this.logger.log(`No existing contact matched sender "${senderEmail}". Auto-creating new Contact in stage REPLIED.`);
-      const defaultUser = await this.prisma.user.findFirst();
-      if (defaultUser) {
-        const fallbackName = senderDisplay && !senderDisplay.includes('@')
-          ? senderDisplay
-          : senderEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-        contact = await this.prisma.contact.create({
-          data: {
-            userId: defaultUser.id,
-            name: fallbackName || 'Inbound Lead',
-            email: senderEmail,
-            company: 'Inbound Inquiry',
-            currentStage: 'REPLIED',
-            lastInteractionDate: new Date(),
-          },
-          include: { user: true },
-        });
-      }
+      this.logger.log(`Inbound email received from "${senderEmail}", but no matching lead exists in the CRM database. Ignoring.`);
+      return {
+        matched: false,
+        message: `Sender "${senderEmail}" is not a lead in the CRM. Ignored.`,
+      };
     }
 
     if (contact) {

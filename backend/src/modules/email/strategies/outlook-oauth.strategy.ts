@@ -74,6 +74,7 @@ export class OutlookOAuthStrategy implements EmailTransportStrategy {
         '<br/>',
       )}</div>`;
 
+      const inboundEmail = process.env.RESEND_INBOUND_EMAIL || 'inbound@fleniiielda.resend.app';
       const graphPayload = {
         message: {
           subject: options.subject,
@@ -81,6 +82,20 @@ export class OutlookOAuthStrategy implements EmailTransportStrategy {
             contentType: 'HTML',
             content: htmlBody,
           },
+          replyTo: [
+            {
+              emailAddress: {
+                address: inboundEmail,
+                name: 'FollowLoop Inbound System',
+              },
+            },
+            {
+              emailAddress: {
+                address: options.senderEmail,
+                name: options.senderName || options.senderEmail,
+              },
+            },
+          ],
           toRecipients: [
             {
               emailAddress: {

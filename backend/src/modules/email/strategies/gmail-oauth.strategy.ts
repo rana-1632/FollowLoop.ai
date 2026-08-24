@@ -82,9 +82,13 @@ export class GmailOAuthStrategy implements EmailTransportStrategy {
         '<br/>',
       )}</div>`;
 
+      const inboundEmail = process.env.RESEND_INBOUND_EMAIL || 'inbound@fleniiielda.resend.app';
+      const replyToHeader = `Reply-To: ${inboundEmail}, ${options.senderEmail}`;
+
       const mimeLines = [
         `From: ${senderHeader}`,
         `To: ${recipientHeader}`,
+        replyToHeader,
         `Subject: ${utf8Subject}`,
         'MIME-Version: 1.0',
         'Content-Type: text/html; charset=utf-8',
