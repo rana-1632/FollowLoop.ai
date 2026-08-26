@@ -229,8 +229,8 @@ export default function DashboardPage() {
 
       <div
         className={cn(
-          "flex flex-1 flex-col transition-all duration-300 min-w-0",
-          isCollapsed ? "ml-16" : "ml-64"
+          "flex flex-1 flex-col transition-all duration-300 min-w-0 ml-0",
+          isCollapsed ? "lg:ml-[72px]" : "lg:ml-[248px]"
         )}
       >
         <Topbar
